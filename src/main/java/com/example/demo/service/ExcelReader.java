@@ -2,8 +2,11 @@ package com.example.demo.service;
 
 import com.example.demo.dto.DataErrorDto;
 import com.example.demo.dto.RowData;
+import com.example.demo.entity.RowDataEntity;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.exception.ErrorCode;
+import com.example.demo.repository.IRowDataRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.opc.OPCPackage;
@@ -31,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 public class ExcelReader {
 
     private final ExecutorService excelProcessExecutor;
+    private final IRowDataRepository rowDataRepository;
 
     public List<?> processExcel(MultipartFile file) throws Exception {
 
@@ -76,7 +80,22 @@ public class ExcelReader {
             throw new BusinessException(ErrorCode.FILE_TIME_OUT.getCode(), ErrorCode.FILE_TIME_OUT.getMessage());
         }
 
-        return new ArrayList<>(errors.isEmpty() ? batchData : errors);
+        if (errors.isEmpty()) {
+            var response = new ArrayList<>(batchData);
+            this.saveBatch(response);
+            return response;
+        }
+
+        return new ArrayList<>(errors);
+    }
+
+    public void saveBatch(List<RowData> rowData) {
+        var data = rowData.stream().map(r -> RowDataEntity.builder()
+                .name(r.getName())
+                .age(r.getAge())
+                .build()
+        ).toList();
+        this.rowDataRepository.saveAll(data);
     }
 
 }
